@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Rust / Cargo
+autorec-turbo/src-tauri/target/
+
+# Node / npm
+autorec-turbo/node_modules/
+autorec-turbo/dist/
+
+# Vite build output
+autorec-turbo/build/
+
+# Tauri bundle output
+autorec-turbo/src-tauri/gen/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/settings.json
+.idea/
