@@ -18,37 +18,69 @@ pub struct InjectPayload {
 // ── Helpers de path ───────────────────────────────────────────────────────────
 
 fn obs_config_dir() -> PathBuf {
-    dirs::home_dir()
+    #[cfg(target_os = "macos")]
+    return dirs::home_dir()
         .expect("home dir não encontrado")
-        .join("Library/Application Support/obs-studio")
+        .join("Library/Application Support/obs-studio");
+
+    #[cfg(target_os = "windows")]
+    return dirs::data_dir()
+        .expect("AppData não encontrado")
+        .join("obs-studio");
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return dirs::home_dir()
+        .expect("home dir não encontrado")
+        .join(".config/obs-studio");
 }
 
 // ── Comandos públicos ─────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn check_obs_installed() -> bool {
-    std::path::Path::new("/Applications/OBS.app").exists()
+    #[cfg(target_os = "macos")]
+    return std::path::Path::new("/Applications/OBS.app").exists();
+
+    #[cfg(target_os = "windows")]
+    return std::path::Path::new(r"C:\Program Files\obs-studio\bin\64bit\obs64.exe").exists();
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return Command::new("which").arg("obs").output().map(|o| o.status.success()).unwrap_or(false);
 }
 
 #[tauri::command]
 pub fn check_obs_running() -> bool {
-    Command::new("pgrep")
+    #[cfg(target_os = "macos")]
+    return Command::new("pgrep")
         .args(["-x", "OBS"])
         .output()
         .map(|o| o.status.success())
-        .unwrap_or(false)
+        .unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    return Command::new("tasklist")
+        .args(["/FI", "IMAGENAME eq obs64.exe", "/NH"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("obs64.exe"))
+        .unwrap_or(false);
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return Command::new("pgrep").arg("obs").output().map(|o| o.status.success()).unwrap_or(false);
 }
 
 /// Instala o OBS via Homebrew (se disponível) ou baixa o DMG diretamente.
 /// Emite eventos "install_log" com progresso.
 #[tauri::command]
 pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
-    // Verifica se já está instalado
     if check_obs_installed() {
         let _ = window.emit("install_log", "OBS já está instalado.");
         return Ok(());
     }
+    install_obs_platform(window).await
+}
 
+#[cfg(target_os = "macos")]
+async fn install_obs_platform(window: tauri::Window) -> Result<(), String> {
     // Prefere Homebrew (mais rápido e seguro)
     if homebrew_available() {
         let _ = window.emit("install_log", "Instalando OBS via Homebrew...");
@@ -64,8 +96,6 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
         let _ = window.emit("install_log", "Homebrew falhou. Tentando download direto...");
     }
 
-    // Fallback: download do DMG oficial (Universal, OBS 31.x)
-    // ATENÇÃO: atualize esta URL a cada nova versão testada
     let obs_url =
         "https://github.com/obsproject/obs-studio/releases/download/31.0.3/OBS-31.0.3-macOS-Universal.dmg";
     let tmp_dmg = "/tmp/obs-installer.dmg";
@@ -83,7 +113,6 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
 
     let _ = window.emit("install_log", "Montando imagem do instalador...");
 
-    // Monta o DMG e captura o ponto de montagem
     let output = Command::new("hdiutil")
         .args(["attach", tmp_dmg, "-nobrowse"])
         .output()
@@ -93,7 +122,6 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
         return Err("Falha ao montar o DMG do OBS.".into());
     }
 
-    // Extrai o caminho /Volumes/... da saída do hdiutil
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mount_point = stdout
         .lines()
@@ -102,7 +130,6 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
         .ok_or("Não foi possível localizar o volume montado do OBS.")?
         .to_string();
 
-    // Encontra o .app dentro do volume
     let app_src = fs::read_dir(&mount_point)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok())
@@ -122,7 +149,6 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
         .status()
         .map_err(|e| e.to_string())?;
 
-    // Desmonta independentemente do resultado da cópia
     let _ = Command::new("hdiutil")
         .args(["detach", &mount_point, "-quiet"])
         .output();
@@ -136,7 +162,51 @@ pub async fn install_obs(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-/// Faz backup da config existente em ~/Library/Application Support/obs-studio-backup-<timestamp>.
+#[cfg(target_os = "windows")]
+async fn install_obs_platform(window: tauri::Window) -> Result<(), String> {
+    let obs_url =
+        "https://github.com/obsproject/obs-studio/releases/download/31.0.3/OBS-31.0.3-Windows-Installer.exe";
+    let tmp_exe = std::env::temp_dir().join("obs-installer.exe");
+    let tmp_exe_str = tmp_exe.to_str().unwrap().to_string();
+
+    let _ = window.emit("install_log", "Baixando OBS Studio...");
+
+    let status = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!("Invoke-WebRequest -Uri '{}' -OutFile '{}'", obs_url, tmp_exe_str),
+        ])
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    if !status.success() {
+        return Err("Falha ao baixar OBS. Verifique sua conexão.".into());
+    }
+
+    let _ = window.emit("install_log", "Instalando OBS Studio (aguarde)...");
+
+    let status = Command::new(&tmp_exe)
+        .arg("/S") // silent install NSIS
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    let _ = fs::remove_file(&tmp_exe);
+
+    if !status.success() {
+        return Err("Falha ao instalar OBS. Tente instalar manualmente.".into());
+    }
+
+    let _ = window.emit("install_log", "OBS instalado com sucesso!");
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+async fn install_obs_platform(_window: tauri::Window) -> Result<(), String> {
+    Err("Instalação automática não suportada nesta plataforma. Instale o OBS manualmente.".into())
+}
+
+/// Faz backup da config OBS existente — cross-platform.
 /// Retorna o caminho do backup, ou "sem-backup" se não havia config.
 #[tauri::command]
 pub fn backup_obs_config() -> Result<String, String> {
@@ -146,26 +216,23 @@ pub fn backup_obs_config() -> Result<String, String> {
     }
 
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+
+    #[cfg(target_os = "macos")]
     let backup_path = dirs::home_dir()
         .unwrap()
-        .join(format!(
-            "Library/Application Support/obs-studio-backup-{}",
-            timestamp
-        ));
+        .join(format!("Library/Application Support/obs-studio-backup-{}", timestamp));
 
-    let status = Command::new("cp")
-        .args([
-            "-R",
-            config_dir.to_str().unwrap(),
-            backup_path.to_str().unwrap(),
-        ])
-        .status()
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    let backup_path = dirs::data_dir()
+        .unwrap()
+        .join(format!("obs-studio-backup-{}", timestamp));
 
-    if !status.success() {
-        return Err("Falha ao criar backup da configuração atual do OBS.".into());
-    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let backup_path = dirs::home_dir()
+        .unwrap()
+        .join(format!(".config/obs-studio-backup-{}", timestamp));
 
+    copy_dir_recursive(&config_dir, &backup_path)?;
     Ok(backup_path.to_str().unwrap().to_string())
 }
 
@@ -197,11 +264,21 @@ pub fn inject_scenes(window: tauri::Window, payload: InjectPayload) -> Result<()
 
 #[tauri::command]
 pub fn launch_obs() -> Result<(), String> {
-    Command::new("open")
+    #[cfg(target_os = "macos")]
+    return Command::new("open")
         .arg("/Applications/OBS.app")
         .spawn()
         .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+
+    #[cfg(target_os = "windows")]
+    return Command::new(r"C:\Program Files\obs-studio\bin\64bit\obs64.exe")
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string());
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return Command::new("obs").spawn().map(|_| ()).map_err(|e| e.to_string());
 }
 
 // ── Construtores de JSON do OBS ───────────────────────────────────────────────
@@ -626,12 +703,29 @@ fn set_ini_value(content: String, section: &str, key: &str, value: &str) -> Stri
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 
+#[cfg(target_os = "macos")]
 fn homebrew_available() -> bool {
     Command::new("brew")
         .arg("--version")
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+/// Copia um diretório recursivamente (cross-platform, sem dependência de shell).
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
+    fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 /// Converte "#RRGGBB" → inteiro ABGR uint32 que o OBS espera para cores de texto.

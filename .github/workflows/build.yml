@@ -1,0 +1,80 @@
+name: Build AutoREC Turbo
+
+on:
+  push:
+    tags:
+      - "v*"          # dispara em qualquer tag v1.0.0, v1.2.3, etc.
+  workflow_dispatch:  # permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin      # Apple Silicon
+            label: macOS-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin       # Intel
+            label: macOS-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc    # Windows 64-bit
+            label: Windows-x64
+
+    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.label }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: autorec-turbo/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: autorec-turbo/src-tauri
+
+      - name: Install frontend deps
+        working-directory: autorec-turbo
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Assinar no macOS requer Apple Developer — deixe comentado até ter o certificado
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: autorec-turbo
+          args: --target ${{ matrix.target }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "AutoREC Turbo ${{ github.ref_name }}"
+          releaseBody: |
+            ## AutoREC Turbo ${{ github.ref_name }}
+
+            ### Download
+            - **macOS (Apple Silicon)**: `.dmg` arm64
+            - **macOS (Intel)**: `.dmg` x64
+            - **Windows**: `.msi` ou `.exe`
+
+            ### Instalação
+            - macOS: abra o `.dmg` e arraste para Applications
+            - Windows: execute o `.msi` (ou `.exe`) e siga o assistente
+          releaseDraft: true    # cria como rascunho — você publica manualmente
+          prerelease: false

@@ -47,14 +47,15 @@ pub async fn activate_license(key: String) -> Result<LicenseResponse, String> {
 /// Deriva um ID de máquina determinístico e anônimo a partir do serial do hardware.
 /// Usa SHA-256(serial + salt) para não expor o serial diretamente.
 pub fn get_machine_id() -> String {
-    let serial = read_ioreg_serial();
+    let serial = read_hardware_serial();
     let mut hasher = Sha256::new();
     hasher.update(serial.as_bytes());
     hasher.update(b":autorec-turbo:v1"); // salt fixo
     hex::encode(hasher.finalize())
 }
 
-fn read_ioreg_serial() -> String {
+#[cfg(target_os = "macos")]
+fn read_hardware_serial() -> String {
     let output = match Command::new("ioreg")
         .args(["-rd1", "-c", "IOPlatformExpertDevice"])
         .output()
@@ -64,14 +65,40 @@ fn read_ioreg_serial() -> String {
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Linha de exemplo: "IOPlatformSerialNumber" = "ABCDE12345"
     stdout
         .lines()
         .find(|l| l.contains("IOPlatformSerialNumber"))
         .and_then(|l| l.splitn(2, " = ").nth(1))
         .map(|s| s.trim().trim_matches('"').to_string())
         .unwrap_or_else(|| "unknown-mac".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn read_hardware_serial() -> String {
+    let output = match Command::new("wmic")
+        .args(["csproduct", "get", "uuid", "/value"])
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return "unknown-win".to_string(),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .find(|l| l.starts_with("UUID="))
+        .map(|l| l.trim_start_matches("UUID=").trim().to_string())
+        .filter(|s| !s.is_empty() && s != "N/A")
+        .unwrap_or_else(|| "unknown-win".to_string())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn read_hardware_serial() -> String {
+    // Linux: lê o machine-id do systemd
+    std::fs::read_to_string("/etc/machine-id")
+        .unwrap_or_else(|_| "unknown-linux".to_string())
+        .trim()
+        .to_string()
 }
 
 async fn call_license_api(
