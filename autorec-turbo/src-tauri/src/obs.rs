@@ -202,8 +202,35 @@ async fn install_obs_platform(window: tauri::Window) -> Result<(), String> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-async fn install_obs_platform(_window: tauri::Window) -> Result<(), String> {
-    Err("Instalação automática não suportada nesta plataforma. Instale o OBS manualmente.".into())
+async fn install_obs_platform(window: tauri::Window) -> Result<(), String> {
+    // Tenta apt-get (Ubuntu / Debian)
+    if Command::new("which").arg("apt-get").output().map(|o| o.status.success()).unwrap_or(false) {
+        let _ = window.emit("install_log", "Instalando OBS via apt-get...");
+        let status = Command::new("pkexec")
+            .args(["apt-get", "install", "-y", "obs-studio"])
+            .status()
+            .map_err(|e| e.to_string())?;
+        if status.success() {
+            let _ = window.emit("install_log", "OBS instalado com sucesso!");
+            return Ok(());
+        }
+        let _ = window.emit("install_log", "apt-get falhou. Tentando Flatpak...");
+    }
+
+    // Tenta flatpak (universal — funciona em qualquer distro com Flatpak)
+    if Command::new("which").arg("flatpak").output().map(|o| o.status.success()).unwrap_or(false) {
+        let _ = window.emit("install_log", "Instalando OBS via Flatpak (Flathub)...");
+        let status = Command::new("flatpak")
+            .args(["install", "--noninteractive", "-y", "flathub", "com.obsproject.Studio"])
+            .status()
+            .map_err(|e| e.to_string())?;
+        if status.success() {
+            let _ = window.emit("install_log", "OBS instalado via Flatpak com sucesso!");
+            return Ok(());
+        }
+    }
+
+    Err("Não foi possível instalar o OBS automaticamente. Instale manualmente:\n  Ubuntu/Debian: sudo apt-get install obs-studio\n  Flatpak: flatpak install flathub com.obsproject.Studio".into())
 }
 
 /// Faz backup da config OBS existente — cross-platform.

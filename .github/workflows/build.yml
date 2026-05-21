@@ -21,6 +21,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc    # Windows 64-bit
             label: Windows-x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu   # Linux x64 — gera .deb e .AppImage
+            label: Linux-x64
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -45,6 +48,19 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: autorec-turbo/src-tauri
+
+      # Tauri no Linux precisa de libs de sistema (webkit, appindicator, etc.)
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            pkg-config
 
       - name: Install frontend deps
         working-directory: autorec-turbo
@@ -72,9 +88,13 @@ jobs:
             - **macOS (Apple Silicon)**: `.dmg` arm64
             - **macOS (Intel)**: `.dmg` x64
             - **Windows**: `.msi` ou `.exe`
+            - **Linux (Ubuntu/Debian)**: `.deb` x64
+            - **Linux (AppImage)**: `.AppImage` x64 (portátil, roda em qualquer distro)
 
             ### Instalação
             - macOS: abra o `.dmg` e arraste para Applications
             - Windows: execute o `.msi` (ou `.exe`) e siga o assistente
+            - Linux `.deb`: `sudo dpkg -i autorec-turbo_*.deb`
+            - Linux AppImage: `chmod +x autorec-turbo_*.AppImage && ./autorec-turbo_*.AppImage`
           releaseDraft: true    # cria como rascunho — você publica manualmente
           prerelease: false
