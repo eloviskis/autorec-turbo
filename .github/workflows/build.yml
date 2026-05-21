@@ -6,6 +6,9 @@ on:
       - "v*"          # dispara em qualquer tag v1.0.0, v1.2.3, etc.
   workflow_dispatch:  # permite rodar manualmente pelo painel do GitHub
 
+permissions:
+  contents: write   # necessário para criar GitHub Releases
+
 jobs:
   build:
     strategy:
