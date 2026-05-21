@@ -5,9 +5,9 @@ use std::process::Command;
 // ── Constantes (substitua pelos valores reais do seu projeto Supabase) ────────
 /// URL da Edge Function de validação de licença
 const SUPABASE_LICENSE_URL: &str =
-    "https://SEU_PROJETO.supabase.co/functions/v1/validate-license";
+    "https://cqedwdzoitxqpwwsjfty.supabase.co/functions/v1/validate-license";
 /// Chave anon pública do Supabase (sem risco — só acessa a Edge Function)
-const SUPABASE_ANON_KEY: &str = "SEU_ANON_KEY_AQUI";
+const SUPABASE_ANON_KEY: &str = "sb_publishable_ftS7BuY-y-Mbp-0nYoss7g_iNZ2-S4f";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
