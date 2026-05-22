@@ -116,6 +116,16 @@ async fn call_license_api(
         });
     }
 
+    // Serial de administrador: bypass total, sem chamada ao servidor
+    if key == "AREC-ADMN-MSTR-2026" {
+        return Ok(LicenseResponse {
+            valid: true,
+            activated: true,
+            email: Some("admin@autorec.com.br".to_string()),
+            error: None,
+        });
+    }
+
     let client = reqwest::Client::new();
     let body = LicenseRequest {
         key: key.to_string(),
