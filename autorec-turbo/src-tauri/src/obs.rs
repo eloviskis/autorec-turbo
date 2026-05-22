@@ -5,6 +5,25 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 
+// ── HTML Overlay Templates ──────────────────────────────────────────────────
+// Placeholders substituídos em runtime: {{NAME}} {{INSTAGRAM}} {{YOUTUBE}} {{ACCENT}}
+
+static TMPL_INICIANDO: &str = r####"<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1920px;height:1080px;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:#080810;color:#fff}.o{position:absolute;border-radius:50%;filter:blur(100px)}.o1{width:800px;height:800px;background:rgba(99,102,241,.3);top:-200px;left:-200px;animation:f1 10s ease-in-out infinite}.o2{width:500px;height:500px;background:rgba(129,140,248,.2);bottom:-150px;right:-100px;animation:f2 12s ease-in-out infinite}@keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(100px,80px)}}@keyframes f2{0%,100%{transform:translate(0,0)}50%{transform:translate(-80px,-60px)}}.glow{position:absolute;inset:0;background:radial-gradient(ellipse 55% 50% at 50% 40%,rgba(99,102,241,.18) 0%,transparent 65%);animation:br 5s ease-in-out infinite}@keyframes br{0%,100%{opacity:.6}50%{opacity:1}}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.05) 1px,transparent 1px);background-size:70px 70px}.c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}.badge{display:inline-flex;align-items:center;gap:10px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.45);border-radius:100px;padding:10px 28px;font-size:15px;font-weight:600;letter-spacing:.25em;text-transform:uppercase;color:#818cf8}.dot{width:10px;height:10px;border-radius:50%;background:{{ACCENT}};animation:bk 1.4s ease-in-out infinite}@keyframes bk{0%,100%{opacity:1}50%{opacity:.1}}h1{font-size:108px;font-weight:900;letter-spacing:-3px;line-height:1.05;text-align:center;background:linear-gradient(135deg,#fff 0%,#a5b4fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.sub{font-size:26px;color:rgba(255,255,255,.4);letter-spacing:.1em}.ln{width:150px;height:2px;background:linear-gradient(90deg,transparent,{{ACCENT}},transparent)}.bot{position:absolute;bottom:0;left:0;right:0;height:130px;display:flex;align-items:center;justify-content:center;gap:48px;background:linear-gradient(transparent,rgba(0,0,0,.85))}.h{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:500;color:rgba(255,255,255,.65)}.hi{color:{{ACCENT}}}.dv{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.25)}</style></head><body><div class="o o1"></div><div class="o o2"></div><div class="grid"></div><div class="glow"></div><div class="c"><div class="badge"><span class="dot"></span>AO VIVO EM BREVE</div><h1>Come&ccedil;ando<br>em breve</h1><div class="ln"></div><p class="sub">Aguarde um momento&hellip;</p></div><div class="bot"><div class="h"><span class="hi">&#9670;</span>&nbsp;@{{INSTAGRAM}}</div><div class="dv"></div><div class="h"><span class="hi">&#9670;</span>&nbsp;{{YOUTUBE}}</div><div class="dv"></div><div class="h" style="color:#818cf8;font-weight:700">{{NAME}}</div></div></body></html>"####;
+
+static TMPL_BRB: &str = r####"<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1920px;height:1080px;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:#080810;color:#fff}.orb{position:absolute;border-radius:50%;filter:blur(100px);width:700px;height:700px;background:rgba(99,102,241,.28);top:50%;left:50%;transform:translate(-50%,-50%);animation:pulse 5s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.05) 1px,transparent 1px);background-size:70px 70px}.c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}.icon{font-size:80px;animation:bob 2s ease-in-out infinite}@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}h1{font-size:112px;font-weight:900;letter-spacing:-3px;background:linear-gradient(135deg,#fff 0%,#a5b4fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.sub{font-size:27px;color:rgba(255,255,255,.4);letter-spacing:.08em}.dots{display:flex;gap:12px;margin-top:6px}.d{width:12px;height:12px;border-radius:50%;background:{{ACCENT}};animation:sp 1.4s ease-in-out infinite}.d:nth-child(2){animation-delay:.2s}.d:nth-child(3){animation-delay:.4s}@keyframes sp{0%,80%,100%{transform:scale(.5);opacity:.3}40%{transform:scale(1);opacity:1}}.bot{position:absolute;bottom:0;left:0;right:0;height:100px;display:flex;align-items:center;justify-content:center;gap:40px;background:linear-gradient(transparent,rgba(0,0,0,.8));font-size:21px;color:rgba(255,255,255,.5);font-weight:500}.sep{color:rgba(255,255,255,.2)}</style></head><body><div class="orb"></div><div class="grid"></div><div class="c"><div class="icon">&#9749;</div><h1>Voltando j&aacute;!</h1><p class="sub">Pequena pausa&hellip;</p><div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div></div></div><div class="bot"><span>@{{INSTAGRAM}}</span><span class="sep">&nbsp;/&nbsp;</span><span>{{YOUTUBE}}</span></div></body></html>"####;
+
+static TMPL_ENCERRAMENTO: &str = r####"<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1920px;height:1080px;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:#080810;color:#fff}.o1{position:absolute;border-radius:50%;filter:blur(100px);width:900px;height:900px;background:rgba(99,102,241,.22);top:50%;left:50%;transform:translate(-50%,-55%);animation:br 6s ease-in-out infinite}.o2{position:absolute;border-radius:50%;filter:blur(100px);width:400px;height:400px;background:rgba(168,85,247,.18);bottom:-100px;left:200px}@keyframes br{0%,100%{opacity:.55}50%{opacity:1}}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.05) 1px,transparent 1px);background-size:70px 70px}.c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}.wave{font-size:78px;animation:wv 2.5s ease-in-out infinite}@keyframes wv{0%,100%{transform:rotate(0)}25%{transform:rotate(22deg)}75%{transform:rotate(-16deg)}}h1{font-size:102px;font-weight:900;letter-spacing:-3px;background:linear-gradient(135deg,#fff 30%,#a5b4fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.sub{font-size:27px;color:rgba(255,255,255,.45);max-width:800px;text-align:center;line-height:1.5}.cards{display:flex;gap:24px;margin-top:12px}.card{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:16px;padding:16px 36px;text-align:center}.plat{font-size:13px;letter-spacing:.15em;text-transform:uppercase;color:#818cf8;margin-bottom:4px}.handle{font-size:25px;font-weight:700}.cta{font-size:16px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:6px}</style></head><body><div class="o1"></div><div class="o2"></div><div class="grid"></div><div class="c"><div class="wave">&#128075;</div><h1>Obrigado!</h1><p class="sub">Foi &oacute;timo ter voc&ecirc;s aqui. Sigam para mais conte&uacute;do!</p><div class="cards"><div class="card"><div class="plat">Instagram</div><div class="handle">@{{INSTAGRAM}}</div></div><div class="card"><div class="plat">YouTube</div><div class="handle">{{YOUTUBE}}</div></div></div><p class="cta">At&eacute; a pr&oacute;xima &#10024;</p></div></body></html>"####;
+
+static TMPL_LOWER_THIRD: &str = r####"<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1920px;height:1080px;overflow:hidden;background:transparent}.lt{position:absolute;bottom:0;left:0;right:0;height:104px;display:flex;align-items:center;padding:0 64px;background:linear-gradient(90deg,rgba(5,5,15,.96) 0%,rgba(5,5,15,.92) 55%,transparent 100%);border-top:3px solid {{ACCENT}};animation:si .7s cubic-bezier(.16,1,.3,1) both}@keyframes si{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.bar{width:5px;height:64px;background:{{ACCENT}};border-radius:3px;margin-right:22px;flex-shrink:0}.info{display:flex;flex-direction:column;gap:5px;flex:1;font-family:'Segoe UI',system-ui,sans-serif}.name{font-size:32px;font-weight:700;color:#fff;letter-spacing:-.5px}.social{font-size:19px;color:rgba(255,255,255,.55)}.logo{width:110px;height:62px;border:2px dashed rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:10px;letter-spacing:.1em;text-align:center;line-height:1.5;font-family:'Segoe UI',system-ui,sans-serif}</style></head><body><div class="lt"><div class="bar"></div><div class="info"><div class="name">{{NAME}}</div><div class="social">@{{INSTAGRAM}}&nbsp;&middot;&nbsp;{{YOUTUBE}}</div></div><div class="logo">SEU<br>LOGO</div></div></body></html>"####;
+
+fn render_tmpl(tmpl: &str, payload: &InjectPayload) -> String {
+    let instagram = payload.instagram.trim().trim_start_matches('@');
+    tmpl.replace("{{NAME}}", payload.name.trim())
+        .replace("{{INSTAGRAM}}", instagram)
+        .replace("{{YOUTUBE}}", payload.youtube.trim())
+        .replace("{{ACCENT}}", &payload.accent_color)
+}
+
 // ── Payload recebido do frontend ─────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -274,8 +293,13 @@ pub fn inject_scenes(window: tauri::Window, payload: InjectPayload) -> Result<()
     fs::create_dir_all(&scenes_dir).map_err(|e| e.to_string())?;
     fs::create_dir_all(&profile_dir).map_err(|e| e.to_string())?;
 
+    let overlay_dir = config_dir.join("autorec-overlays");
+    fs::create_dir_all(&overlay_dir).map_err(|e| e.to_string())?;
+
+    let _ = window.emit("install_log", "Gerando overlays personalizados...");
+    write_overlay_files(&overlay_dir, &payload)?;
     let _ = window.emit("install_log", "Construindo coleção de cenas...");
-    let scene_json = build_scene_collection(&payload);
+    let scene_json = build_scene_collection(&payload, &overlay_dir);
     fs::write(scenes_dir.join("AutoREC Turbo.json"), scene_json)
         .map_err(|e| e.to_string())?;
 
@@ -368,6 +392,7 @@ fn make_display_source(obs_id: &str) -> serde_json::Value {
     })
 }
 
+#[allow(dead_code)]
 fn make_window_source(obs_id: &str) -> serde_json::Value {
     #[cfg(target_os = "windows")]
     let settings = serde_json::json!({ "window": "", "show_cursor": true });
@@ -382,6 +407,7 @@ fn make_window_source(obs_id: &str) -> serde_json::Value {
     })
 }
 
+#[allow(dead_code)]
 fn make_text_source(name: &str, text: &str, color_hex: &str) -> serde_json::Value {
     // Converte hex "#RRGGBB" → ABGR uint32 que o OBS espera
     let color_int = hex_to_obs_color(color_hex);
@@ -481,81 +507,94 @@ fn make_scene(name: &str, items: Vec<serde_json::Value>) -> serde_json::Value {
     })
 }
 
-/// Monta o JSON completo do Scene Collection do OBS.
-fn build_scene_collection(payload: &InjectPayload) -> String {
-    let display_text = format!(
-        "{} | @{}",
-        payload.name.trim(),
-        payload.instagram.trim().trim_start_matches('@')
-    );
+fn write_overlay_files(dir: &std::path::Path, payload: &InjectPayload) -> Result<(), String> {
+    let files: &[(&str, &str)] = &[
+        ("iniciando.html",    TMPL_INICIANDO),
+        ("brb.html",          TMPL_BRB),
+        ("encerramento.html", TMPL_ENCERRAMENTO),
+        ("lower-third.html",  TMPL_LOWER_THIRD),
+    ];
+    for (name, tmpl) in files {
+        fs::write(dir.join(name), render_tmpl(tmpl, payload))
+            .map_err(|e| format!("Erro ao gravar overlay {}: {}", name, e))?;
+    }
+    Ok(())
+}
 
-    // IDs de fonte específicos por plataforma
+/// Monta o JSON completo do Scene Collection do OBS.
+fn build_scene_collection(payload: &InjectPayload, overlay_dir: &std::path::Path) -> String {
+    let ov = |f: &str| overlay_dir.join(f).to_string_lossy().into_owned();
+
+    let browser = |name: &str, file: &str| -> serde_json::Value {
+        serde_json::json!({
+            "deinterlace_field_order": 0, "deinterlace_mode": 0, "enabled": true, "flags": 0,
+            "hotkeys": {}, "id": "browser_source", "mixers": 0, "monitoring_type": 0, "muted": false,
+            "name": name, "prev_ver": null, "private_settings": {},
+            "push-to-mute-delay": 0, "push-to-talk-delay": 0,
+            "settings": {
+                "css": "body{background-color:rgba(0,0,0,0);margin:0;overflow:hidden}",
+                "fps": 30, "fps_custom": false, "height": 1080, "is_local_file": true,
+                "local_file": ov(file), "reroute_audio": false, "restart_when_active": true,
+                "shutdown": false, "url": "", "webpage_control_level": 1, "width": 1920
+            },
+            "sync": 0, "versioned_id": "browser_source", "volume": 1.0
+        })
+    };
+
     #[cfg(target_os = "macos")]
-    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+    let (audio_in_id, audio_out_id, webcam_id, screen_id) = (
         "coreaudio_input_capture", "coreaudio_output_capture",
-        "av_capture_input_v2", "display_capture", "window_capture",
+        "av_capture_input_v2", "display_capture",
     );
     #[cfg(target_os = "windows")]
-    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+    let (audio_in_id, audio_out_id, webcam_id, screen_id) = (
         "wasapi_input_capture", "wasapi_output_capture",
-        "dshow_input", "monitor_capture", "window_capture",
+        "dshow_input", "monitor_capture",
     );
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+    let (audio_in_id, audio_out_id, webcam_id, screen_id) = (
         "pulse_input_capture", "pulse_output_capture",
-        "v4l2_input", "xshm_input", "xcomposite_input",
+        "v4l2_input", "xshm_input",
     );
 
-    // ── Sources compartilhados ─────────────────────────────────────────────
     let webcam = make_webcam_source(webcam_id);
     let screen = make_display_source(screen_id);
-    let window = make_window_source(window_id);
-    let name_bar = make_text_source("Faixa de Nome", &display_text, &payload.accent_color);
 
-    // ── Cenas ──────────────────────────────────────────────────────────────
+    // ── 6 Cenas profissionais ──────────────────────────────────────────────
 
-    // 1. Você + Slides: tela cheia + webcam 320×180 canto inferior direito + faixa
-    let scene_slides = make_scene(
-        "Você + Slides",
+    let sc_start = make_scene(
+        "\u{1F3AC} Iniciando",
+        vec![scene_item("Overlay: Iniciando", 1, 0.0, 0.0, 1.0, 1.0, true)],
+    );
+    let sc_cam = make_scene(
+        "\u{1F4F8} C\u{E2}mera",
+        vec![
+            scene_item("Webcam",      1, 0.0, 0.0, 1.0, 1.0, true),
+            scene_item("Lower Third", 2, 0.0, 0.0, 1.0, 1.0, true),
+        ],
+    );
+    let sc_screen = make_scene(
+        "\u{1F5A5}\u{FE0F} Tela",
         vec![
             scene_item("Captura de Tela", 1, 0.0, 0.0, 1.0, 1.0, true),
-            scene_item("Webcam", 2, 1600.0, 900.0, 0.1667, 0.1667, true),
-            scene_item("Faixa de Nome", 3, 30.0, 980.0, 1.0, 1.0, true),
+            scene_item("Lower Third",     2, 0.0, 0.0, 1.0, 1.0, true),
         ],
     );
-
-    // 2. Tela Cheia: display capture + webcam menor
-    let scene_fullscreen = make_scene(
-        "Tela Cheia",
+    let sc_pip = make_scene(
+        "\u{1F3A5} C\u{E2}mera + Tela",
         vec![
-            scene_item("Captura de Tela", 1, 0.0, 0.0, 1.0, 1.0, true),
-            scene_item("Webcam", 2, 1580.0, 20.0, 0.1667, 0.1667, true),
+            scene_item("Captura de Tela", 1,    0.0,   0.0, 1.0,  1.0,  true),
+            scene_item("Webcam",          2, 1556.0, 862.0, 0.25, 0.25, true),
+            scene_item("Lower Third",     3,    0.0,   0.0, 1.0,  1.0,  true),
         ],
     );
-
-    // 3. Tablet / Escrita: captura de janela + webcam
-    let scene_tablet = make_scene(
-        "Tablet / Escrita",
-        vec![
-            scene_item("Captura de Janela", 1, 0.0, 0.0, 1.0, 1.0, true),
-            scene_item("Webcam", 2, 1600.0, 900.0, 0.1667, 0.1667, true),
-            scene_item("Faixa de Nome", 3, 30.0, 980.0, 1.0, 1.0, true),
-        ],
+    let sc_brb = make_scene(
+        "\u{2615} BRB",
+        vec![scene_item("Overlay: BRB", 1, 0.0, 0.0, 1.0, 1.0, true)],
     );
-
-    // 4. Pré-Evento: só a faixa de nome centralizada
-    let scene_pre = make_scene(
-        "Pré-Evento",
-        vec![scene_item("Faixa de Nome", 1, 510.0, 502.0, 1.0, 1.0, true)],
-    );
-
-    // 5. Live / Reunião: webcam centralizada ocupando o canvas
-    let scene_live = make_scene(
-        "Live / Reunião",
-        vec![
-            scene_item("Webcam", 1, 0.0, 0.0, 1.0, 1.0, true),
-            scene_item("Faixa de Nome", 2, 30.0, 980.0, 1.0, 1.0, true),
-        ],
+    let sc_end = make_scene(
+        "\u{1F44B} Encerramento",
+        vec![scene_item("Overlay: Encerramento", 1, 0.0, 0.0, 1.0, 1.0, true)],
     );
 
     let collection = serde_json::json!({
@@ -564,29 +603,33 @@ fn build_scene_collection(payload: &InjectPayload) -> String {
         "AuxAudioDevice3": null,
         "AuxAudioDevice4": null,
         "AuxAudioDevice5": null,
-        "DesktopAudioDevice1": make_audio_source(1, "Áudio do Sistema", audio_out_id),
+        "DesktopAudioDevice1": make_audio_source(1, "\u{C1}udio do Sistema", audio_out_id),
         "DesktopAudioDevice2": null,
-        "current_scene": "Você + Slides",
-        "current_program_scene": "Você + Slides",
+        "current_scene": "\u{1F3AC} Iniciando",
+        "current_program_scene": "\u{1F3AC} Iniciando",
         "modules": {},
         "name": "AutoREC Turbo",
         "scene_order": [
-            { "name": "Você + Slides" },
-            { "name": "Tela Cheia" },
-            { "name": "Tablet / Escrita" },
-            { "name": "Pré-Evento" },
-            { "name": "Live / Reunião" }
+            {"name": "\u{1F3AC} Iniciando"},
+            {"name": "\u{1F4F8} C\u{E2}mera"},
+            {"name": "\u{1F5A5}\u{FE0F} Tela"},
+            {"name": "\u{1F3A5} C\u{E2}mera + Tela"},
+            {"name": "\u{2615} BRB"},
+            {"name": "\u{1F44B} Encerramento"}
         ],
         "sources": [
+            browser("Overlay: Iniciando",    "iniciando.html"),
+            browser("Overlay: BRB",          "brb.html"),
+            browser("Overlay: Encerramento", "encerramento.html"),
+            browser("Lower Third",           "lower-third.html"),
             webcam,
             screen,
-            window,
-            name_bar,
-            scene_slides,
-            scene_fullscreen,
-            scene_tablet,
-            scene_pre,
-            scene_live
+            sc_start,
+            sc_cam,
+            sc_screen,
+            sc_pip,
+            sc_brb,
+            sc_end
         ],
         "transitions": [{
             "duration": 300,
