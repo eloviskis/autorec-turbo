@@ -8,6 +8,7 @@ use tauri::Emitter;
 // ── Payload recebido do frontend ─────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InjectPayload {
     pub name: String,
     pub instagram: String,
