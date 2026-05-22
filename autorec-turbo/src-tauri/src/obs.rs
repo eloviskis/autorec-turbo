@@ -336,82 +336,49 @@ fn make_audio_source(id: usize, name: &str, obs_id: &str) -> serde_json::Value {
     })
 }
 
-fn make_webcam_source() -> serde_json::Value {
+fn make_webcam_source(obs_id: &str) -> serde_json::Value {
+    #[cfg(target_os = "macos")]
+    let settings = serde_json::json!({ "device": "", "device_name": "", "frame_rate": { "denominator": 1, "numerator": 30 }, "input_format": -1, "preset": -1, "resolution": "" });
+    #[cfg(target_os = "windows")]
+    let settings = serde_json::json!({ "video_device_id": "", "last_resolution": "", "fps": 0 });
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let settings = serde_json::json!({ "device_id": "", "pixelformat": 0, "resolution": "" });
     serde_json::json!({
-        "balance": 0.5,
-        "deinterlace_field_order": 0,
-        "deinterlace_mode": 0,
-        "enabled": true,
-        "flags": 0,
-        "hotkeys": {},
-        "id": "av_capture_input_v2",
-        "mixers": 0,
-        "monitoring_type": 0,
-        "muted": false,
-        "name": "Webcam",
-        "prev_ver": 503316481,
-        "private_settings": {},
-        "push-to-mute-delay": 0,
-        "push-to-talk-delay": 0,
-        "settings": {
-            "device": "",
-            "device_name": "",
-            "frame_rate": { "denominator": 1, "numerator": 30 },
-            "input_format": -1,
-            "preset": -1,
-            "resolution": ""
-        },
-        "sync": 0,
-        "versioned_id": "av_capture_input_v2",
-        "volume": 1.0
+        "deinterlace_field_order": 0, "deinterlace_mode": 0, "enabled": true, "flags": 0,
+        "hotkeys": {}, "id": obs_id, "mixers": 0, "monitoring_type": 0, "muted": false,
+        "name": "Webcam", "prev_ver": null, "private_settings": {},
+        "push-to-mute-delay": 0, "push-to-talk-delay": 0, "settings": settings,
+        "sync": 0, "versioned_id": obs_id, "volume": 1.0
     })
 }
 
-fn make_display_source() -> serde_json::Value {
+fn make_display_source(obs_id: &str) -> serde_json::Value {
+    #[cfg(target_os = "macos")]
+    let settings = serde_json::json!({ "display": 0, "show_cursor": true });
+    #[cfg(target_os = "windows")]
+    let settings = serde_json::json!({ "monitor": 0, "show_cursor": true });
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let settings = serde_json::json!({ "show_cursor": true });
     serde_json::json!({
-        "balance": 0.5,
-        "deinterlace_field_order": 0,
-        "deinterlace_mode": 0,
-        "enabled": true,
-        "flags": 0,
-        "hotkeys": {},
-        "id": "display_capture",
-        "mixers": 0,
-        "monitoring_type": 0,
-        "muted": false,
-        "name": "Captura de Tela",
-        "prev_ver": 503316481,
-        "private_settings": {},
-        "push-to-mute-delay": 0,
-        "push-to-talk-delay": 0,
-        "settings": { "display": 0, "show_cursor": true },
-        "sync": 0,
-        "versioned_id": "display_capture",
-        "volume": 1.0
+        "deinterlace_field_order": 0, "deinterlace_mode": 0, "enabled": true, "flags": 0,
+        "hotkeys": {}, "id": obs_id, "mixers": 0, "monitoring_type": 0, "muted": false,
+        "name": "Captura de Tela", "prev_ver": null, "private_settings": {},
+        "push-to-mute-delay": 0, "push-to-talk-delay": 0, "settings": settings,
+        "sync": 0, "versioned_id": obs_id, "volume": 1.0
     })
 }
 
-fn make_window_source() -> serde_json::Value {
+fn make_window_source(obs_id: &str) -> serde_json::Value {
+    #[cfg(target_os = "windows")]
+    let settings = serde_json::json!({ "window": "", "show_cursor": true });
+    #[cfg(not(target_os = "windows"))]
+    let settings = serde_json::json!({ "owner_name": "", "show_cursor": true });
     serde_json::json!({
-        "balance": 0.5,
-        "deinterlace_field_order": 0,
-        "deinterlace_mode": 0,
-        "enabled": true,
-        "flags": 0,
-        "hotkeys": {},
-        "id": "window_capture",
-        "mixers": 0,
-        "monitoring_type": 0,
-        "muted": false,
-        "name": "Captura de Janela",
-        "prev_ver": 503316481,
-        "private_settings": {},
-        "push-to-mute-delay": 0,
-        "push-to-talk-delay": 0,
-        "settings": { "owner_name": "", "show_cursor": true },
-        "sync": 0,
-        "versioned_id": "window_capture",
-        "volume": 1.0
+        "deinterlace_field_order": 0, "deinterlace_mode": 0, "enabled": true, "flags": 0,
+        "hotkeys": {}, "id": obs_id, "mixers": 0, "monitoring_type": 0, "muted": false,
+        "name": "Captura de Janela", "prev_ver": null, "private_settings": {},
+        "push-to-mute-delay": 0, "push-to-talk-delay": 0, "settings": settings,
+        "sync": 0, "versioned_id": obs_id, "volume": 1.0
     })
 }
 
@@ -522,10 +489,27 @@ fn build_scene_collection(payload: &InjectPayload) -> String {
         payload.instagram.trim().trim_start_matches('@')
     );
 
+    // IDs de fonte específicos por plataforma
+    #[cfg(target_os = "macos")]
+    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+        "coreaudio_input_capture", "coreaudio_output_capture",
+        "av_capture_input_v2", "display_capture", "window_capture",
+    );
+    #[cfg(target_os = "windows")]
+    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+        "wasapi_input_capture", "wasapi_output_capture",
+        "dshow_input", "monitor_capture", "window_capture",
+    );
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let (audio_in_id, audio_out_id, webcam_id, screen_id, window_id) = (
+        "pulse_input_capture", "pulse_output_capture",
+        "v4l2_input", "xshm_input", "xcomposite_input",
+    );
+
     // ── Sources compartilhados ─────────────────────────────────────────────
-    let webcam = make_webcam_source();
-    let screen = make_display_source();
-    let window = make_window_source();
+    let webcam = make_webcam_source(webcam_id);
+    let screen = make_display_source(screen_id);
+    let window = make_window_source(window_id);
     let name_bar = make_text_source("Faixa de Nome", &display_text, &payload.accent_color);
 
     // ── Cenas ──────────────────────────────────────────────────────────────
@@ -575,24 +559,25 @@ fn build_scene_collection(payload: &InjectPayload) -> String {
     );
 
     let collection = serde_json::json!({
-        "AuxAudioDevice1": make_audio_source(0, "Microfone", "coreaudio_input_capture"),
+        "AuxAudioDevice1": make_audio_source(0, "Microfone", audio_in_id),
         "AuxAudioDevice2": null,
         "AuxAudioDevice3": null,
         "AuxAudioDevice4": null,
         "AuxAudioDevice5": null,
-        "CurrentPreviewScene": "Você + Slides",
-        "CurrentProgramScene": "Você + Slides",
-        "DesktopAudioDevice1": make_audio_source(1, "Áudio do Sistema", "coreaudio_output_capture"),
+        "DesktopAudioDevice1": make_audio_source(1, "Áudio do Sistema", audio_out_id),
         "DesktopAudioDevice2": null,
-        "Modules": {},
-        "SceneOrder": [
+        "current_scene": "Você + Slides",
+        "current_program_scene": "Você + Slides",
+        "modules": {},
+        "name": "AutoREC Turbo",
+        "scene_order": [
             { "name": "Você + Slides" },
             { "name": "Tela Cheia" },
             { "name": "Tablet / Escrita" },
             { "name": "Pré-Evento" },
             { "name": "Live / Reunião" }
         ],
-        "Sources": [
+        "sources": [
             webcam,
             screen,
             window,
@@ -603,14 +588,13 @@ fn build_scene_collection(payload: &InjectPayload) -> String {
             scene_pre,
             scene_live
         ],
-        "Transitions": [{
+        "transitions": [{
             "duration": 300,
             "hotkeys": {},
             "id": "fade_transition",
             "name": "Fade",
             "settings": {}
-        }],
-        "name": "AutoREC Turbo"
+        }]
     });
 
     serde_json::to_string_pretty(&collection).unwrap_or_default()
