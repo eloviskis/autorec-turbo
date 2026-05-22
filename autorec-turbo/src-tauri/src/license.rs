@@ -126,6 +126,7 @@ async fn call_license_api(
     let response = client
         .post(SUPABASE_LICENSE_URL)
         .header("apikey", SUPABASE_ANON_KEY)
+        .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
